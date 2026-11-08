@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d47a1">
+<title>Queue Ticket · بلیت نوبت</title>
+<style>
+  :root{
+    --bg1:#0b3b8c; --bg2:#1565c0; --card:#ffffff; --ink:#10233f; --muted:#5b6b82;
+    --ok:#1b8f3a; --warn:#e65100; --bad:#b71c1c; --pc:#1565c0;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{
+    font-family:system-ui,"Segoe UI",Tahoma,Arial,sans-serif; color:var(--ink);
+    background:linear-gradient(160deg,var(--bg1),var(--bg2)); min-height:100vh;
+    padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));
+  }
+  main{max-width:440px;margin:0 auto}
+  header{display:flex;justify-content:space-between;align-items:center;color:#fff;margin-bottom:14px}
+  #brand{font-weight:700;letter-spacing:.3px}
+  #lang{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:6px 14px;font-size:14px;cursor:pointer}
+  .card{background:var(--card);border-radius:24px;padding:22px 20px 18px;text-align:center;box-shadow:0 14px 40px rgba(0,0,0,.28);position:relative;overflow:hidden}
+  .label{font-size:14px;color:var(--muted)}
+  .ring{position:relative;width:min(68vw,250px);aspect-ratio:1;margin:10px auto 6px;display:grid;place-items:center}
+  .ring .spin{position:absolute;inset:0;border-radius:50%;
+    background:conic-gradient(from 0deg,var(--pc),rgba(0,0,0,0) 55%,var(--pc));
+    -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 12px),#000 calc(100% - 11px));
+            mask:radial-gradient(farthest-side,transparent calc(100% - 12px),#000 calc(100% - 11px));
+    animation:spin 2.6s linear infinite}
+  .ring .in{position:relative;width:calc(100% - 34px);aspect-ratio:1;border-radius:50%;background:#f4f7fc;display:grid;place-items:center}
+  #num{font-size:clamp(54px,21vw,96px);font-weight:800;direction:ltr;line-height:1;letter-spacing:1px}
+  #queue{font-size:20px;font-weight:700;margin-top:4px}
+  .muted{color:var(--muted);font-size:13px}
+  .live{display:flex;gap:8px;align-items:center;justify-content:center;margin:14px 0 6px;font-size:14px}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--ok);animation:pulse 1.1s ease-in-out infinite}
+  #clock{font-variant-numeric:tabular-nums;font-weight:700;font-size:18px;direction:ltr}
+  .sweep{height:6px;border-radius:6px;background:#e4eaf4;overflow:hidden;margin:6px 0 14px}
+  .sweep i{display:block;height:100%;width:35%;border-radius:6px;background:var(--pc);animation:sweep 1.8s ease-in-out infinite alternate}
+  .verify{display:flex;align-items:center;justify-content:center;gap:14px;background:#f4f7fc;border-radius:16px;padding:10px 14px}
+  .badge{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:30px;background:var(--pc);box-shadow:0 0 0 0 var(--pc);animation:ping 2s ease-out infinite}
+  #patname{font-weight:700;font-size:16px}
+  .hint{font-size:12.5px;color:var(--muted);margin:12px 4px 0;line-height:1.7}
+  .status{margin-top:14px;border-radius:18px;padding:16px;text-align:center;font-size:18px;font-weight:700;color:#fff;background:#37474f}
+  .status.waiting{background:#1565c0}
+  .status.called{background:var(--ok);animation:flash 1s ease-in-out infinite alternate;font-size:22px}
+  .status.done,.status.skipped{background:#607d8b}
+  .status.off{background:rgba(255,255,255,.18);font-size:14px;font-weight:500}
+  .empty{background:var(--card);border-radius:24px;padding:32px 22px;text-align:center;line-height:1.9}
+  .qrbox{margin-top:14px;background:#f4f7fc;border-radius:16px;padding:14px;text-align:center}
+  .qrbox svg{width:min(56vw,210px);height:auto;background:#fff;border-radius:10px;padding:6px;display:block;margin:8px auto 0}
+  [hidden]{display:none!important}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{50%{opacity:.25;transform:scale(.7)}}
+  @keyframes sweep{from{margin-inline-start:0}to{margin-inline-start:65%}}
+  @keyframes ping{70%{box-shadow:0 0 0 16px rgba(0,0,0,0)}100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}}
+  @keyframes flash{from{filter:brightness(1)}to{filter:brightness(1.35)}}
+  @media (prefers-reduced-motion:reduce){.ring .spin,.dot,.sweep i,.badge,.status.called{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div id="brand">نوبت‌دهی · Queue</div>
+    <button id="lang" type="button" aria-label="language">English</button>
+  </header>
+
+  <section id="ticketView" hidden>
+    <div id="status" class="status off" hidden style="margin:0 0 14px"></div>
+    <div class="card">
+      <div class="label" data-t="yourTicket"></div>
+      <div class="ring"><div class="spin"></div><div class="in"><div id="num"></div></div></div>
+      <div id="queue"></div>
+      <div class="muted" id="issued"></div>
+      <div class="live"><span class="dot"></span><span data-t="live"></span><span id="clock">--:--:--</span></div>
+      <div class="sweep"><i></i></div>
+      <div class="verify">
+        <div class="badge" id="badge"></div>
+        <div><div class="muted" data-t="pattern"></div><div id="patname"></div></div>
+      </div>
+      <div class="qrbox" id="qrBox" hidden>
+        <div class="muted" data-t="qrTitle"></div>
+        <svg id="qrsvg" role="img" aria-label="QR"></svg>
+      </div>
+      <p class="hint" data-t="hint"></p>
+    </div>
+  </section>
+
+  <section id="emptyView" class="empty" hidden>
+    <div style="font-size:42px">📱</div>
+    <div data-t="empty"></div>
+  </section>
+</main>
+
+<script>
+// Minimal QR encoder (byte mode, ECC level M, versions 1-12). Returns {size, get(x,y)}.
+var QR=(function(){
+  var ECC=[-1,10,16,26,18,24,16,18,22,22,26,30,22], NB=[-1,1,1,1,2,2,4,4,4,5,5,5,8];
+  function raw(v){var r=(16*v+128)*v+64; if(v>=2){var na=Math.floor(v/7)+2; r-=(25*na-10)*na-55; if(v>=7)r-=36;} return r;}
+  function dcw(v){return Math.floor(raw(v)/8)-ECC[v]*NB[v];}
+  function mul(x,y){var z=0;for(var i=7;i>=0;i--){z=(z<<1)^((z>>>7)*0x11D);z^=((y>>>i)&1)*x;}return z&255;}
+  function divisor(d){var r=[],i,j;for(i=0;i<d-1;i++)r.push(0);r.push(1);var root=1;
+    for(i=0;i<d;i++){for(j=0;j<d;j++){r[j]=mul(r[j],root);if(j+1<d)r[j]^=r[j+1];}root=mul(root,2);}return r;}
+  function rem(data,div){var r=div.map(function(){return 0;});
+    data.forEach(function(b){var f=b^r[0];r.shift();r.push(0);div.forEach(function(c,i){r[i]^=mul(c,f);});});return r;}
+  function utf8(s){return Array.prototype.slice.call(new TextEncoder().encode(s));}
+  function bit(x,i){return ((x>>>i)&1)!==0;}
+  function encode(text){
+    var data=utf8(text),ver=0,v,cc;
+    for(v=1;v<=12;v++){cc=v<=9?8:16;if(4+cc+8*data.length<=dcw(v)*8){ver=v;break;}}
+    if(!ver)throw new Error("too long"); cc=ver<=9?8:16;
+    var bits=[];function put(val,n){for(var i=n-1;i>=0;i--)bits.push((val>>>i)&1);}
+    put(4,4);put(data.length,cc);data.forEach(function(b){put(b,8);});
+    var cap=dcw(ver)*8; put(0,Math.min(4,cap-bits.length)); while(bits.length%8)bits.push(0);
+    for(var pad=0xEC;bits.length<cap;pad^=0xEC^0x11)put(pad,8);
+    var cw=[];for(var i=0;i<bits.length/8;i++)cw.push(0);
+    bits.forEach(function(b,i){cw[i>>3]|=b<<(7-(i&7));});
+    var nb=NB[ver],el=ECC[ver],rw=Math.floor(raw(ver)/8),ns=nb-rw%nb,sl=Math.floor(rw/nb),blocks=[],div=divisor(el),k=0;
+    for(i=0;i<nb;i++){var n=sl-el+(i<ns?0:1),dat=cw.slice(k,k+n);k+=n;var ecc=rem(dat,div);if(i<ns)dat=dat.concat([0]);blocks.push(dat.concat(ecc));}
+    var fin=[];for(i=0;i<blocks[0].length;i++)blocks.forEach(function(b,j){if(i!==sl-el||j>=ns)fin.push(b[i]);});
+    var size=ver*4+17,mod=[],fn=[],y,x;
+    for(y=0;y<size;y++){mod.push(new Array(size).fill(false));fn.push(new Array(size).fill(false));}
+    function setf(x,y,d){mod[y][x]=d;fn[y][x]=true;}
+    function finder(cx,cy){for(var dy=-4;dy<=4;dy++)for(var dx=-4;dx<=4;dx++){var d=Math.max(Math.abs(dx),Math.abs(dy)),xx=cx+dx,yy=cy+dy;
+      if(xx>=0&&xx<size&&yy>=0&&yy<size)setf(xx,yy,d!==2&&d!==4);}}
+    function align(cx,cy){for(var dy=-2;dy<=2;dy++)for(var dx=-2;dx<=2;dx++)setf(cx+dx,cy+dy,Math.max(Math.abs(dx),Math.abs(dy))!==1);}
+    function fmt(mask){var d=mask,r=d,i;for(i=0;i<10;i++)r=(r<<1)^((r>>>9)*0x537);
+      var b=((d<<10)|r)^0x5412;
+      for(i=0;i<6;i++)setf(8,i,bit(b,i)); setf(8,7,bit(b,6));setf(8,8,bit(b,7));setf(7,8,bit(b,8));
+      for(i=9;i<15;i++)setf(14-i,8,bit(b,i)); for(i=0;i<8;i++)setf(size-1-i,8,bit(b,i));
+      for(i=8;i<15;i++)setf(8,size-15+i,bit(b,i)); setf(8,size-8,true);}
+    for(i=0;i<size;i++){setf(6,i,i%2===0);setf(i,6,i%2===0);}
+    finder(3,3);finder(size-4,3);finder(3,size-4);
+    var na=ver===1?0:Math.floor(ver/7)+2,pos=[];
+    if(ver>1){var step=Math.floor((ver*4+na*2+1)/(na*2-2))*2;pos=new Array(na).fill(0);pos[0]=6;var p=size-7;for(i=na-1;i>0;i--){pos[i]=p;p-=step;}}
+    for(i=0;i<na;i++)for(var j=0;j<na;j++){if((i===0&&j===0)||(i===0&&j===na-1)||(i===na-1&&j===0))continue;align(pos[i],pos[j]);}
+    fmt(0);
+    if(ver>=7){var r=ver;for(i=0;i<12;i++)r=(r<<1)^((r>>>11)*0x1F25);var vb=(ver<<12)|r;
+      for(i=0;i<18;i++){var c=bit(vb,i),a=size-11+i%3,b=Math.floor(i/3);setf(a,b,c);setf(b,a,c);}}
+    i=0;var right=size-1;
+    while(right>=1){if(right===6)right=5;
+      for(var vert=0;vert<size;vert++)for(j=0;j<2;j++){x=right-j;var up=((right+1)&2)===0;y=up?size-1-vert:vert;
+        if(!fn[y][x]&&i<fin.length*8){mod[y][x]=bit(fin[i>>3],7-(i&7));i++;}}
+      right-=2;}
+    function mask(m){for(y=0;y<size;y++)for(x=0;x<size;x++){var inv;
+      switch(m){case 0:inv=(x+y)%2===0;break;case 1:inv=y%2===0;break;case 2:inv=x%3===0;break;case 3:inv=(x+y)%3===0;break;
+        case 4:inv=(Math.floor(x/3)+Math.floor(y/2))%2===0;break;case 5:inv=x*y%2+x*y%3===0;break;
+        case 6:inv=(x*y%2+x*y%3)%2===0;break;default:inv=((x+y)%2+x*y%3)%2===0;}
+      if(inv&&!fn[y][x])mod[y][x]=!mod[y][x];}}
+    function eq(seg,pt){for(var q=0;q<11;q++)if(seg[q]!==pt[q])return false;return true;}
+    function penalty(){var s=0,lines=[],q,kk;
+      for(y=0;y<size;y++)lines.push(mod[y].slice());
+      for(x=0;x<size;x++){var col=[];for(y=0;y<size;y++)col.push(mod[y][x]);lines.push(col);}
+      var p1=[true,false,true,true,true,false,true,false,false,false,false],p2=[false,false,false,false,true,false,true,true,true,false,true];
+      lines.forEach(function(l){var run=1;for(kk=1;kk<size;kk++){if(l[kk]===l[kk-1]){run++;if(run===5)s+=3;else if(run>5)s+=1;}else run=1;}
+        for(kk=0;kk<size-10;kk++){var seg=l.slice(kk,kk+11);if(eq(seg,p1))s+=40;if(eq(seg,p2))s+=40;}});
+      for(y=0;y<size-1;y++)for(x=0;x<size-1;x++){var c=mod[y][x];if(c===mod[y][x+1]&&c===mod[y+1][x]&&c===mod[y+1][x+1])s+=3;}
+      var dark=0;for(y=0;y<size;y++)for(x=0;x<size;x++)if(mod[y][x])dark++;
+      var tot=size*size;s+=(Math.ceil(Math.abs(dark*20-tot*10)/tot)-1)*10;return s;}
+    var best=-1,bm=0;
+    for(var m=0;m<8;m++){mask(m);fmt(m);var pn=penalty();if(best<0||pn<best){best=pn;bm=m;}mask(m);}
+    mask(bm);fmt(bm);
+    return {size:size,ver:ver,get:function(x,y){return mod[y][x];}};
+  }
+  return {encode:encode};
+})();
+
+
+</script>
+<script>
+(function(){
+  // ---- verification pattern: must match the server (sig bytes 0 and 1) ----
+  var COLORS=[["#D32F2F","قرمز","Red","أحمر"],["#2E7D32","سبز","Green","أخضر"],["#1565C0","آبی","Blue","أزرق"],["#EF6C00","نارنجی","Orange","برتقالي"],
+              ["#6A1B9A","بنفش","Purple","بنفسجي"],["#00838F","فیروزه‌ای","Teal","فيروزي"],["#C2185B","صورتی","Pink","وردي"],["#4E342E","قهوه‌ای","Brown","بني"]];
+  var SYMS=["●","■","▲","◆","★","♥","♣","♠"];
+
+  var T={
+    fa:{yourTicket:"بلیت شما",live:"زنده",pattern:"الگوی تأیید",issued:"صدور",queue:"صف",
+        qrTitle:"این QR را به متصدی باجه نشان دهید تا اسکن کند",
+        hint:"صفحه زنده است (ساعت و حلقه حرکت می‌کنند)؛ تصویر ثابت یا اسکرین‌شات معتبر نیست. شماره‌ی شما هر وقت فراخوانده شود همین‌جا اعلام می‌شود.",
+        empty:"ابتدا کد QR روی کیوسک را با دوربین گوشی اسکن کنید.",
+        ahead:function(n){return n+" نفر قبل از شما";},next:"نفر بعدی شما هستید",
+        called:function(c){return "لطفاً به "+c+" مراجعه کنید";},calledPlain:"نوبت شما است! به باجه مراجعه کنید",
+        done:"نوبت شما پایان یافته است",skipped:"نوبت شما رد شد",off:"اتصال به سیستم برقرار نیست",unknown:"وضعیت زنده در دسترس نیست",btn:"English"},
+    en:{yourTicket:"Your ticket",live:"LIVE",pattern:"Verification pattern",issued:"Issued",queue:"Queue",
+        qrTitle:"Show this QR to the counter staff to scan",
+        hint:"This page is live (the clock and ring move); a still picture or screenshot is not valid. You will be notified here when your number is called.",
+        empty:"Scan the QR code on the kiosk with your phone camera first.",
+        ahead:function(n){return n+(n==1?" person":" people")+" ahead of you";},next:"You are next",
+        called:function(c){return "Please go to "+c;},calledPlain:"It's your turn! Please go to the counter",
+        done:"Your turn is finished",skipped:"Your turn was skipped",off:"Cannot reach the system",unknown:"Live status unavailable",btn:"العربية"},
+    ar:{yourTicket:"تذكرتك",live:"مباشر",pattern:"نمط التحقق",issued:"الإصدار",queue:"الطابور",
+        qrTitle:"اعرض هذا الرمز على موظف الشباك ليمسحه",
+        hint:"الصفحة مباشرة (الساعة والحلقة تتحركان)؛ الصورة الثابتة أو لقطة الشاشة غير صالحة. ستظهر هنا رسالة عند مناداة رقمك.",
+        empty:"امسح رمز QR على الكشك بكاميرا هاتفك أولاً.",
+        ahead:function(n){return n+" أشخاص قبلك";},next:"أنت التالي",
+        called:function(c){return "يرجى التوجه إلى "+c;},calledPlain:"حان دورك! توجه إلى الشباك",
+        done:"انتهى دورك",skipped:"تم تخطي دورك",off:"لا يمكن الاتصال بالنظام",unknown:"الحالة المباشرة غير متاحة",btn:"فارسی"}
+  };
+  var ORDER=["fa","en","ar"], IDX={fa:1,en:2,ar:3};
+
+  function $(id){return document.getElementById(id);}
+  function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v);}catch(e){return null;}}
+
+  var lang=store("lang");
+  if(!T[lang]){var nl=((navigator.language||"fa")+"").slice(0,2);lang=T[nl]?nl:"fa";}
+
+  // ---- ticket from URL (#t=ID.TS.SIG&n=Name) or saved copy ----
+  function parse(){
+    var raw=(location.hash||"").replace(/^#/,"")||(location.search||"").replace(/^\?/,"");
+    var p=new URLSearchParams(raw), t=p.get("t");
+    if(t){
+      var a=t.split(".");
+      if(a.length===3 && /^\d{9,11}$/.test(a[1]) && /^[0-9a-fA-F]{12}$/.test(a[2]))
+        return {id:a[0],ts:+a[1],sig:a[2].toLowerCase(),name:p.get("n")||"",token:t,v:p.get("v")||""};
+    }
+    return null;
+  }
+  var tk=parse();
+  if(tk){store("last",JSON.stringify({h:location.hash||location.search}));}
+  else{
+    try{var s=JSON.parse(store("last")||"null"); if(s&&s.h){var p2=new URLSearchParams(s.h.replace(/^[#?]/,"")),t2=p2.get("t");
+      if(t2){var a2=t2.split("."); if(a2.length===3)tk={id:a2[0],ts:+a2[1],sig:a2[2].toLowerCase(),name:p2.get("n")||"",token:t2,v:p2.get("v")||""};}}}catch(e){}
+  }
+
+  function applyLang(){
+    var L=T[lang]; document.documentElement.lang=lang; document.documentElement.dir=(lang==="en")?"ltr":"rtl";
+    [].forEach.call(document.querySelectorAll("[data-t]"),function(el){var v=L[el.getAttribute("data-t")]; if(typeof v==="string")el.textContent=v;});
+    $("lang").textContent=L.btn;
+    if(tk){
+      var b0=parseInt(tk.sig.slice(0,2),16), c=COLORS[b0%8];
+      $("patname").textContent=c[IDX[lang]];
+      $("queue").textContent=(tk.name?tk.name:"");
+      var d=new Date(tk.ts*1000);
+      $("issued").textContent=L.issued+": "+d.toLocaleDateString("en-GB")+"  "+d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+      renderStatus(lastStatus);
+    }
+  }
+
+  $("lang").onclick=function(){lang=ORDER[(ORDER.indexOf(lang)+1)%3];store("lang",lang);applyLang();};
+
+  if(!tk){ $("emptyView").hidden=false; applyLang(); return; }
+
+  // ---- static ticket view ----
+  $("ticketView").hidden=false;
+  $("num").textContent=tk.id;
+  var b0=parseInt(tk.sig.slice(0,2),16), b1=parseInt(tk.sig.slice(2,4),16), col=COLORS[b0%8];
+  document.documentElement.style.setProperty("--pc",col[0]);
+  $("badge").textContent=SYMS[b1%8];
+
+  // ---- QR for the counter staff: opens the verification page on the shop Wi-Fi (v = shop server address) ----
+  (function(){
+    try{
+      var v=(tk.v||"").replace(/^https?:\/\//,"").replace(/\/.*$/,"");
+      if(!/^[A-Za-z0-9.\-:]+$/.test(v))v="";
+      var payload=v?"http://"+v+"/v.html#t="+tk.token:"t="+tk.token;
+      var q=QR.encode(payload),n=q.size,pad=2,d="",x,y;
+      for(y=0;y<n;y++)for(x=0;x<n;x++)if(q.get(x,y))d+="M"+(x+pad)+","+(y+pad)+"h1v1h-1z";
+      var svg=$("qrsvg");
+      svg.setAttribute("viewBox","0 0 "+(n+2*pad)+" "+(n+2*pad));
+      svg.setAttribute("shape-rendering","crispEdges");
+      svg.innerHTML='<path d="'+d+'" fill="#000"/>';
+      $("qrBox").hidden=false;
+    }catch(e){}
+  })();
+
+  function tick(){ $("clock").textContent=new Date().toLocaleTimeString("en-GB"); }
+  tick(); setInterval(tick,250);
+
+  // ---- live status (served by the internet relay or by the queue server itself) ----
+  var lastStatus=null, prev=null, liveState=null; // liveState: null unknown, true ok, false unavailable
+  function renderStatus(j){
+    var el=$("status"), L=T[lang];
+    if(liveState===false){el.hidden=true;return;}
+    if(!j){return;}
+    el.hidden=false; el.className="status";
+    if(j==="off"){el.className="status off";el.textContent=L.off;return;}
+    if(!j.ok){el.className="status off";el.textContent=L.unknown;return;}
+    var s=j.status;
+    el.classList.add(s);
+    if(s==="waiting") el.textContent=(j.ahead===0)?L.next:(j.ahead>0?L.ahead(j.ahead):L.unknown);
+    else if(s==="called") el.textContent=j.counter?L.called(j.counter):L.calledPlain;
+    else if(s==="done") el.textContent=L.done;
+    else if(s==="skipped") el.textContent=L.skipped;
+    else {el.className="status off";el.textContent=L.unknown;}
+  }
+  function poll(){
+    var base=location.pathname.replace(/[^\/]*$/,"");
+    fetch(base+"api/status?t="+encodeURIComponent(tk.token),{cache:"no-store"})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(j&&j.stale)j="off";
+        liveState=true; lastStatus=j; renderStatus(j);
+        if(j&&j.ok&&j.status==="called"&&prev!=="called"&&navigator.vibrate)navigator.vibrate([300,150,300,150,600]);
+        prev=j&&j.ok?j.status:prev;
+        setTimeout(poll,3000);
+      })
+      .catch(function(){
+        if(liveState===null){liveState=false;$("status").hidden=true;return;}   // static hosting: no live status
+        lastStatus="off"; renderStatus("off"); setTimeout(poll,5000);
+      });
+  }
+  poll();
+
+  // ---- keep the screen on ----
+  var wl=null;
+  function lock(){try{if("wakeLock" in navigator)navigator.wakeLock.request("screen").then(function(w){wl=w;}).catch(function(){});}catch(e){}}
+  lock(); document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")lock();});
+
+  applyLang();
+})();
+</script>
+</body>
+</html>
